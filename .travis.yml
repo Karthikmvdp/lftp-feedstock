@@ -3,21 +3,26 @@
 
 language: generic
 
-os: osx
-osx_image: xcode6.4
+os: linux-ppc64le
 
 env:
+  matrix:
+
+    - CONDA_PY=27
+    - CONDA_PY=35
+    - CONDA_PY=36
   global:
     # The BINSTAR_TOKEN secure variable. This is defined canonically in conda-forge.yml.
-    - secure: "Ly/5Xs4Whq2jcYK9RzfMIsv2znopAHnv9yow/P0GI1kR/5zVbAH8rfp0n55aiYATXEcCA7CqBaEEwXPkXqaVdBjycqlQrlLyWtpjLiuVvKV90meXokBJTTsPq+0/owKrlYqQTkveu+vR2CHquigu3cRPJMT4uJlPplOgmzyGrMXN+3nTw/2BSrPFI7BVf2q2Pjf1GfFeAF/RXLR7cj6Stcy9mF2GsJwbU77lsw0fEX+uaXGqUWrnXqjGeI1OEx/6EjTni51fF32ywUdW0wjHuMzI5IhRzjztW0J0q/QSlFDvqTOMB7NboLOEf2CT1JhQlh9tHclydgfyfocb+8f/+W+AghqnXE+xN11ZauSg/wrg/JIXC9ByXMnm3EmUjA6y5gcfQNNrsQiWOCqL7KZVbN9IdsWirQPW2LMJgGeJ6qWTSxaovVtAAC0EfTmS8rHvdrBeuRNpaFkdunSLo+o6xZGMtDA0TVbqS4AphoOpbVqxjesUkPT1L8eTDsaa846kkFMvsZf8pE9j5JQi06iPB6UQ4pbzKCPyxWIGyvYN5QM8stZebuLs9YFWjX4WjvSQRVw11CIBxjT9JuuI9eTNElONgrMby3/9CiYKdciVh0jQ0EDH0NAMQmDXR+l53bLSmKXL6MzO0R19FJtnUe6wOWa6XgjqM54AeRZMmkPVw54="
+    - secure: "An8Bq3hcdkkEUBBIxrnbpTB2qAHXaLeEarLQVc7SdY1AYPohxkO9xV7ghUTk1L5QoOBNvw0Nc4S8XoIqscvGru+teYw+R0FkX8h30UhHed4lm/teVGmDmMZxKWHPTGDUNJxkacX17+UihYfVk//9DGx/DEVfbtFkA0vb6ogC82nrWWEqqWih/BrjOvE06xPSdfaUa17x1jJT7L9O4h+0lU8S7wp5cOZ4Jy+ZtqhOLAmyAD28SmRWf3o4FDDrQhS01NnFj9902IP9+lsvY/rhL2ADDj2aSsw1bBiPSUfKjJoTi7KBWjhOk/3WeVf5ld8b2S09DRBQ4bklMMQVsnHKqEUsSiWb3RRr1Q49MRQlXWnmHJsZFViW8cIj5fOCHRrfg4Z6Ni8qrvoVG/BXWEwE2dfQl9+2nJU8PNdYy3tLa9EUbeX+2QYDXE+6Z2OhVwmoKImeuw7bQNADnbaA1Glcdkh+Z2QS+D27fEIX3/paBx35sa/OWeG62u3DhchoRLOwAX15NhAxllLqfmZZd83RxmjV9q++dkxv5ZA8XFF5+lB0XLztkb7N/n8/Ek0NwkxMT6qHsqbtQPLCKu0kTC0t7zfwYIM42F0qXx+k+AXk8PU5fr/4l8XiVECGqrgGRnDGHCXySeNnOjYC3H4t+LG3FskabdPETJDuAtXERUQSOQc="
 
 
 before_install:
     # Fast finish the PR.
+    - sudo apt-get -qq update
+    - sudo apt-get install  lftp
     - |
-      (curl https://raw.githubusercontent.com/conda-forge/conda-forge-build-setup-feedstock/master/recipe/ff_ci_pr_build.py | \
+      (curl https://raw.githubusercontent.com/conda-forge/conda-forge-ci-setup-feedstock/master/recipe/ff_ci_pr_build.py | \
           python - -v --ci "travis" "${TRAVIS_REPO_SLUG}" "${TRAVIS_BUILD_NUMBER}" "${TRAVIS_PULL_REQUEST}") || exit 1
-
     # Remove homebrew.
     - |
       echo ""
@@ -26,31 +31,32 @@ before_install:
       chmod +x ~/uninstall_homebrew
       ~/uninstall_homebrew -fq
       rm ~/uninstall_homebrew
-
-
 install:
     # Install Miniconda.
     - |
-      echo ""
       echo "Installing a fresh version of Miniconda."
       MINICONDA_URL="https://repo.continuum.io/miniconda"
-      MINICONDA_FILE="Miniconda3-latest-MacOSX-x86_64.sh"
+      MINICONDA_FILE="Miniconda3-latest-Linux-ppc64le.sh"
       curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
-      bash $MINICONDA_FILE -b
-
+      bash $MINICONDA_FILE -b -bfp /opt/conda
     # Configure conda.
     - |
       echo ""
       echo "Configuring conda."
-      source /Users/travis/miniconda3/bin/activate root
+      source /opt/conda/bin/activate root
+      conda install -y conda-build
+      conda install -y anaconda-client
       conda config --remove channels defaults
       conda config --add channels defaults
+      conda config --add channels karthikm 
       conda config --add channels conda-forge
       conda config --set show_channel_urls true
-      conda install --yes --quiet conda-forge-build-setup
-      source run_conda_forge_build_setup
-
+      conda config --set anaconda_upload no
+      #conda install --yes --quiet conda-forge-ci-setup=1
+      #source run_conda_forge_build_setup
+      #anaconda -v  -y login --username $USER --password $PASSWORD
 script:
   - conda build ./recipe
-
-  - upload_or_check_non_existence ./recipe conda-forge --channel=main
+  - ls /opt/conda/conda-bld/linux-ppc64le/
+  - lftp -c "open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER; set ssl-allow yes; set passive-mode yes; set ssl:verify-certificate no; put -O $FTP_DIRECTORY $(ls /opt/conda/conda-bld/linux-ppc64le/lftp*) "
+#- upload_or_check_non_existence ./recipe conda-forge --channel=main -m ./${CONFIG}.yaml
